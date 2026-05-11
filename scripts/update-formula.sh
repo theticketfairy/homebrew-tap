@@ -1,18 +1,25 @@
 #!/usr/bin/env bash
-# Regenerate the Homebrew formula from the template, fill in the per-arch
-# sha256 hashes from the freshly-published GitHub Release tarballs, and
+# Regenerate the Homebrew formula from the template, filling in the
+# version and the sha256 of the freshly-published npm tarball, then
 # commit + push the result.
 #
-# Invoked by the release workflow in `theticketfairy/ticketfairy-cli`
-# after `pack-tarballs` and `github-release` have run, so the tarballs
-# we curl below are guaranteed to exist.
+# Invoked by the release workflow in
+# `theticketfairy/ticketfairy-cli` after `publish-npm` has run, so
+# the tarball we curl below is guaranteed to exist.
+#
+# Why npm and not the GitHub Release: the source repo is private.
+# Release assets behind a private repo require an authenticated
+# download — useless for unauthenticated Homebrew users. The npm
+# registry is the public artifact path: `npm publish --access public`
+# from CI produces an unauth-fetchable tarball at
+# `https://registry.npmjs.org/@theticketfairy/cli/-/cli-<version>.tgz`.
 #
 # Usage: scripts/update-formula.sh <binary> <tag> <version>
 #   binary  — formula name (e.g. `ticketfairy`)
-#   tag     — git tag (e.g. `v0.1.0`); used in the release URL
+#   tag     — git tag (e.g. `v0.1.0`); not currently used in the
+#             generated formula but accepted for symmetry with the
+#             previous signature and for trace-log readability
 #   version — bare version (e.g. `0.1.0`); written into Formula/<binary>.rb
-#
-# Run from the repository root.
 
 set -euo pipefail
 
@@ -28,31 +35,45 @@ if [ ! -f "$template" ]; then
   exit 1
 fi
 
-fetch_sha() {
-  local target="$1"
-  curl -fsSL "https://github.com/theticketfairy/ticketfairy-cli/releases/download/${tag}/${binary}-${tag}-${target}.tar.gz" \
-    | shasum -a 256 \
-    | awk '{print $1}'
-}
+# Resolve the canonical npm tarball URL via the registry metadata so
+# we hash the exact bytes npm itself will hand to Homebrew on
+# `brew install`. The `dist.tarball` field is the immutable post-
+# publish URL; `dist.shasum` is the SHA-1 npm uses internally —
+# Homebrew wants SHA-256, so we re-hash the downloaded blob.
+tarball_url="https://registry.npmjs.org/@theticketfairy/cli/-/cli-${version}.tgz"
 
-darwin_arm64_sha="$(fetch_sha darwin-arm64)"
-darwin_x64_sha="$(fetch_sha darwin-x64)"
-linux_arm64_sha="$(fetch_sha linux-arm64)"
-linux_x64_sha="$(fetch_sha linux-x64)"
+echo "Fetching $tarball_url"
+# Retry against the npm CDN's brief eventual-consistency window
+# right after `npm publish`. Five attempts × 10s = up to 50s of
+# tolerance, which is more than enough in practice (typically
+# reachable within a few seconds).
+sha=""
+for attempt in 1 2 3 4 5; do
+  if sha="$(curl -fsSL "$tarball_url" | shasum -a 256 | awk '{print $1}')"; then
+    if [ -n "$sha" ] && [ "$sha" != "" ]; then
+      break
+    fi
+  fi
+  echo "fetch attempt $attempt for $tarball_url failed; sleeping 10s" >&2
+  sleep 10
+  sha=""
+done
+
+if [ -z "$sha" ]; then
+  echo "error: could not fetch + hash $tarball_url after 5 attempts" >&2
+  exit 1
+fi
 
 # Regenerate from the template so the placeholder strings are always
 # present in the source — every release rebuilds from a known-good
 # starting point rather than mutating the previous output in place.
 sed \
   -e "s/VERSION_PLACEHOLDER/${version}/g" \
-  -e "s/DARWIN_ARM64_SHA/${darwin_arm64_sha}/g" \
-  -e "s/DARWIN_X64_SHA/${darwin_x64_sha}/g" \
-  -e "s/LINUX_ARM64_SHA/${linux_arm64_sha}/g" \
-  -e "s/LINUX_X64_SHA/${linux_x64_sha}/g" \
+  -e "s/NPM_TARBALL_SHA/${sha}/g" \
   "$template" > "$formula"
 
 git config user.name "ticketfairy-bot"
 git config user.email "bot@theticketfairy.com"
 git add "$formula"
-git commit -m "Bump ${binary} to ${version}"
+git commit -m "Bump ${binary} to ${version} (npm tarball, sha256 ${sha:0:12}…)"
 git push
