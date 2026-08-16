@@ -43,10 +43,8 @@ fi
 tarball_url="https://registry.npmjs.org/@theticketfairy/cli/-/cli-${version}.tgz"
 
 echo "Fetching $tarball_url"
-# Retry against the npm CDN's brief eventual-consistency window
-# right after `npm publish`. Five attempts × 10s = up to 50s of
-# tolerance, which is more than enough in practice (typically
-# reachable within a few seconds).
+# The release workflow waits for npm's publish-time malware scan before
+# invoking this script. Keep a short retry window here for residual CDN lag.
 sha=""
 for attempt in 1 2 3 4 5; do
   if sha="$(curl -fsSL "$tarball_url" | shasum -a 256 | awk '{print $1}')"; then
@@ -71,6 +69,13 @@ sed \
   -e "s/VERSION_PLACEHOLDER/${version}/g" \
   -e "s/NPM_TARBALL_SHA/${sha}/g" \
   "$template" > "$formula"
+
+# A full workflow rerun may reach the tap after this exact version was already
+# committed. Succeed without creating an empty commit in that recovery case.
+if git diff --quiet -- "$formula"; then
+  echo "$formula is already at ${version} (${sha:0:12}…); nothing to commit."
+  exit 0
+fi
 
 git config user.name "ticketfairy-bot"
 git config user.email "bot@theticketfairy.com"
