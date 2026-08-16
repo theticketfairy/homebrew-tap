@@ -7,11 +7,8 @@
 # `theticketfairy/ticketfairy-cli` after `publish-npm` has run, so
 # the tarball we curl below is guaranteed to exist.
 #
-# Why npm and not the GitHub Release: the source repo is private.
-# Release assets behind a private repo require an authenticated
-# download — useless for unauthenticated Homebrew users. The npm
-# registry is the public artifact path: `npm publish --access public`
-# from CI produces an unauth-fetchable tarball at
+# npm is the canonical distribution artifact for both npm and Homebrew.
+# `npm publish --access public` from CI produces a publicly fetchable tarball at
 # `https://registry.npmjs.org/@theticketfairy/cli/-/cli-<version>.tgz`.
 #
 # Usage: scripts/update-formula.sh <binary> <tag> <version>
