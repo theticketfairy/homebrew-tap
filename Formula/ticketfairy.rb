@@ -1,7 +1,7 @@
 require "language/node"
 
 class Ticketfairy < Formula
-  desc "Ticket Fairy command-line interface"
+  desc "Command-line interface for the Ticket Fairy platform"
   homepage "https://github.com/theticketfairy/ticketfairy-cli"
   # The source repo is private, so we publish + pull from npm rather
   # than GitHub Releases. npm tarballs are immutable post-publish, so
@@ -16,14 +16,14 @@ class Ticketfairy < Formula
   depends_on "node"
 
   def install
-    # `Language::Node.std_npm_install_args(libexec)` resolves to the
+    # `std_npm_args` resolves to the
     # canonical "install a node CLI into Homebrew's libexec sandbox"
     # incantation: it runs `npm install -g --prefix #{libexec}` with
     # the right flags (no scripts that would break in the sandbox,
     # production deps only, no audit). The CLI tarball pulled by
     # `url` above is the post-publish artifact (compiled `dist/`, no
     # devDeps), so we can install it directly.
-    system "npm", "install", *Language::Node.std_npm_install_args(libexec)
+    system "npm", "install", *std_npm_args
     # The published package installs as
     # `#{libexec}/lib/node_modules/@theticketfairy/cli/bin/run.js`
     # with `ticketfairy` as the package.json `bin` entry — Homebrew
