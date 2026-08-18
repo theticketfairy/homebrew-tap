@@ -8,7 +8,7 @@
 #
 # npm is the canonical distribution artifact for both npm and Homebrew.
 # `npm publish --access public` from CI produces a publicly fetchable tarball at
-# `https://registry.npmjs.org/@theticketfairy/cli/-/cli-<version>.tgz`.
+# `https://registry.npmjs.org/ticketfairy/-/ticketfairy-<version>.tgz`.
 #
 # Usage: scripts/update-formula.sh <binary> <tag> <version>
 #   binary  — formula name (e.g. `ticketfairy`)
@@ -36,7 +36,7 @@ fi
 # `brew install`. The `dist.tarball` field is the immutable post-
 # publish URL; `dist.shasum` is the SHA-1 npm uses internally —
 # Homebrew wants SHA-256, so we re-hash the downloaded blob.
-tarball_url="https://registry.npmjs.org/@theticketfairy/cli/-/cli-${version}.tgz"
+tarball_url="https://registry.npmjs.org/ticketfairy/-/ticketfairy-${version}.tgz"
 
 echo "Fetching $tarball_url"
 # The release workflow waits for npm's publish-time malware scan before
